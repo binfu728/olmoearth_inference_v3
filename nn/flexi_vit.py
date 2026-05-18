@@ -173,9 +173,13 @@ class Encoder(nn.Module):
         out_dict = {}
         start = 0
         for mod in present_modalities:
-            length = math.prod(d_dict[mod][1:])
-            out_dict[mod] = tokens[:, start:start+length].view(tokens.shape[0], *d_dict[mod][1:])
+            # 【修复 1】：只计算空间和时间维度的乘积 (H * W * T * S)，排除最后一个维度 D
+            length = math.prod(d_dict[mod][1:-1]) 
+            
+            # 【修复 2】：在第二维(序列维)切片，并保留第三维(:)，然后 view 成完整的 6D 形状
+            out_dict[mod] = tokens[:, start:start+length, :].view(tokens.shape[0], *d_dict[mod][1:])
             out_dict[f"{mod}_mask"] = tokens_dict[f"{mod}_mask"]
+            
             start += length
                 
         return out_dict
