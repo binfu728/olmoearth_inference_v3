@@ -1,0 +1,39 @@
+{
+    "model": {
+        "embedding_size": 768,
+        "max_patch_size": 8,
+        "num_heads": 12,
+        "mlp_ratio": 4.0,
+        "depth": 12,
+        "max_timesteps": 12,
+        "qk_norm": false,
+        "use_linear_patch_embed": false
+    },
+    "modalities": {
+        "supported": [
+            "sentinel2_l2a",
+            "sentinel1",
+            "landsat"
+        ],
+        "inference_use": [
+            "sentinel2_l2a",
+            "sentinel1",
+            "landsat"
+        ]
+    },
+    "inference": {
+        "patch_size": 4,
+        "batch_size": 1,
+        "device": "cuda",
+        "normalize_strategy": "computed",
+        "metadata": null,
+        "h5_dir": null,
+        "output_dir": "results",
+        "max_samples": null,
+        "save_features": false,
+        "visualize": true
+    },
+    "paths": {
+        "weights": "params/weights.pth"
+    }
+}
