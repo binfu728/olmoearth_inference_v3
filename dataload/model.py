@@ -2,19 +2,11 @@
 
 import json
 from pathlib import Path
-from typing import Dict
-
 import torch
-
 from data.constants import Modality
 
-
 def load_config(config_path: str | Path = None) -> dict:
-    """从配置文件加载配置
-    
-    Args:
-        config_path: 配置文件路径，默认使用 params/config.json
-    """
+    """从配置文件加载配置"""
     if config_path is None:
         config_path = Path(__file__).parent.parent / "params" / "config.json"
     
@@ -24,36 +16,28 @@ def load_config(config_path: str | Path = None) -> dict:
             return json.load(f)
     return {}
 
-
 def load_model_direct(config_dict: dict):
-    """直接从传入的配置字典构建模型
+    """直接从传入的配置字典构建模型 (极致精简版)"""
+    from nn.flexi_vit import Encoder
+    from data.constants import get_modality_specs_from_names
     
-    Args:
-        config_dict: 完整的配置字典
-    
-    Returns:
-        构建好的Encoder模型
-    """
-    from nn.flexi_vit import EncoderConfig
-    
+    # 1. 提取基础网络参数
     model_config = config_dict.get('model', {})
-    supported = config_dict.get('modalities', {}).get('supported', Modality.names())
     
-    model_config['supported_modality_names'] = supported
-    encoder_config = EncoderConfig.from_dict(model_config)
+    # 2. 获取支持的模态字符串列表
+    supported_names = config_dict.get('modalities', {}).get('supported', Modality.names())
     
-    encoder = encoder_config.build()
+    # 3. 转换并注入 supported_modalities 对象列表
+    model_config['supported_modalities'] = get_modality_specs_from_names(supported_names)
+    
+    # 4. 字典解包，直接构建模型！
+    encoder = Encoder(**model_config)
     print("模型构建成功（仅 Encoder）")
+    
     return encoder
 
-
 def load_model_with_weights(model, weights_path: str | Path = None):
-    """加载模型权重，支持动态键名映射
-    
-    Args:
-        model: 已构建的模型
-        weights_path: 权重文件路径，默认使用 params/weights.pth
-    """
+    """加载模型权重，支持动态键名映射"""
     if weights_path is None:
         weights_path = Path(__file__).parent.parent / "params" / "weights.pth"
     

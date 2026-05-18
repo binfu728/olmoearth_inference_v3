@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class Attention(nn.Module):
     """Multi-head attention module for Inference."""
     def __init__(self, dim: int, num_heads: int = 8, qkv_bias: bool = False, qk_norm: bool = False, norm_layer: nn.Module = nn.LayerNorm, **kwargs):

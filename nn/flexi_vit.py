@@ -1,14 +1,11 @@
 """Model code for the OlmoEarth Encoder - inference only version."""
 
-import logging
 import math
-from dataclasses import dataclass
 
 import torch
 from einops import rearrange, repeat
-from torch import Tensor, nn
+from torch import nn
 
-from config import Config
 from data.constants import BASE_GSD, Modality, ModalitySpec, get_modality_specs_from_names, MaskValue
 from nn.attention import Block
 from nn.encodings import (
@@ -17,8 +14,6 @@ from nn.encodings import (
     get_month_encoding_table,
 )
 from nn.flexi_patch_embed import FlexiPatchEmbed
-
-logger = logging.getLogger(__name__)
 
 
 def get_modalities_to_process(available_modalities: list[str], supported_modality_names: list[str]) -> list[str]:
@@ -86,7 +81,7 @@ class CompositeEncodings(nn.Module):
             shape = (modality.num_band_sets, self.embedding_dim_per_embedding_type)
             self.per_modality_channel_embeddings[modality.name] = nn.Parameter(torch.zeros(shape), requires_grad=False)
 
-    def forward(self, tokens_dict: dict, present_modalities: list[str], timestamps: Tensor, patch_size: int, input_res: int = BASE_GSD) -> dict:
+    def forward(self, tokens_dict: dict, present_modalities: list[str], timestamps, patch_size: int, input_res: int = BASE_GSD) -> dict:
         output_dict = {}
         for mod_name in present_modalities:
             tokens = tokens_dict[mod_name]
@@ -144,70 +139,43 @@ class Encoder(nn.Module):
                 qkv_bias=True, 
                 qk_norm=qk_norm, 
                 norm_layer=nn.LayerNorm,
-                cross_attn=False,
-                drop_path=0.1,
-                use_flash_attn=False
             ) for _ in range(depth)
         ])
         
         self.norm = nn.LayerNorm(embedding_size)
 
-    def collapse_and_combine(self, x: dict, present_modalities: list[str]) -> tuple[Tensor, Tensor, dict]:
-        tokens, masks = [], []
-        d_dict = {}
-        for mod in present_modalities:
-            d_dict[mod] = x[mod].shape
-            tokens.append(rearrange(x[mod], "b h w t s d -> b (h w t s) d"))
-            masks.append(rearrange(x[f"{mod}_mask"], "b h w t s -> b (h w t s)"))
-        return torch.cat(tokens, dim=1), torch.cat(masks, dim=1), d_dict
-
-    def split_and_expand(self, tokens: Tensor, present_modalities: list[str], d_dict: dict) -> dict:
-        result = {}
-        lengths = [math.prod(d_dict[mod][1:-1]) for mod in present_modalities]
-        split_tokens = torch.split(tokens, lengths, dim=1)
-        
-        for mod, mod_tokens in zip(present_modalities, split_tokens):
-            result[mod] = mod_tokens.view(tokens.shape[0], *d_dict[mod][1:])
-        return result
-
     def forward(self, x: dict, patch_size: int, input_res: int = BASE_GSD) -> dict:
         present_modalities = get_modalities_to_process(list(x.keys()), self.supported_modality_names)
         
+        # 1. Patch Embedding & Encoding
         tokens_dict = self.patch_embeddings(x, present_modalities, patch_size)
         encoded_dict = self.composite_encodings(tokens_dict, present_modalities, x["timestamps"], patch_size, input_res)
         
-        tokens, mask, d_dict = self.collapse_and_combine(encoded_dict, present_modalities)
+        # 2. Collapse: [B, H, W, T, S, D] -> [B, L, D]
+        d_dict = {}
+        tokens_list, masks_list = [], []
+        for mod in present_modalities:
+            d_dict[mod] = encoded_dict[mod].shape
+            tokens_list.append(rearrange(encoded_dict[mod], "b h w t s d -> b (h w t s) d"))
+            masks_list.append(rearrange(encoded_dict[f"{mod}_mask"], "b h w t s -> b (h w t s)"))
+        tokens = torch.cat(tokens_list, dim=1)
+        mask = torch.cat(masks_list, dim=1)
+        
         attn_mask = (mask == MaskValue.ONLINE_ENCODER.value)
         
+        # 3. Transformer Blocks
         for blk in self.blocks:
             tokens = blk(x=tokens, attn_mask=attn_mask)
         
         tokens = self.norm(tokens)
-        out_dict = self.split_and_expand(tokens, present_modalities, d_dict)
         
+        # 4. Split & Expand: [B, L, D] -> [B, H, W, T, S, D]
+        out_dict = {}
+        start = 0
         for mod in present_modalities:
+            length = math.prod(d_dict[mod][1:])
+            out_dict[mod] = tokens[:, start:start+length].view(tokens.shape[0], *d_dict[mod][1:])
             out_dict[f"{mod}_mask"] = tokens_dict[f"{mod}_mask"]
+            start += length
                 
         return out_dict
-
-
-@dataclass
-class EncoderConfig(Config):
-    supported_modality_names: list[str]
-    embedding_size: int = 16
-    max_patch_size: int = 8
-    num_heads: int = 2
-    mlp_ratio: float = 1.0
-    depth: int = 2
-    max_timesteps: int = 12
-    qk_norm: bool = False
-    use_linear_patch_embed: bool = False
-
-    def validate(self) -> None:
-        if not self.supported_modality_names: raise ValueError("At least one modality must be added!")
-
-    def build(self) -> Encoder:
-        self.validate()
-        kwargs = self.as_dict()
-        kwargs["supported_modalities"] = get_modality_specs_from_names(kwargs.pop("supported_modality_names"))
-        return Encoder(**kwargs)

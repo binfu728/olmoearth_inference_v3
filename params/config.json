@@ -10,30 +10,52 @@
         "use_linear_patch_embed": false
     },
     "modalities": {
+        // 模型支持的多模态列表（运行时由输入数据动态决定实际使用的模态）
         "supported": [
-            "sentinel2_l2a",
-            "sentinel1",
-            "landsat"
-        ],
-        "inference_use": [
             "sentinel2_l2a",
             "sentinel1",
             "landsat"
         ]
     },
     "inference": {
+        // patch_size: 当前推理时实际使用的 Patch 尺寸
+        // 必须 2 的幂且 <= max_patch_size（如 2, 4, 8）
         "patch_size": 4,
+
+        // batch_size: DataLoader 每次喂入显卡的数据批次大小
         "batch_size": 1,
+
+        // device: 计算设备，"cuda" 为 GPU，"cpu" 为 CPU
         "device": "cuda",
+
+        // normalize_strategy: 数据归一化策略
+        //   "computed" - 使用数据集整体统计的均值和方差（Mean/Std）进行归一化
+        //   "predefined" - 使用预定义的物理极值（Min/Max）进行截断归一化
         "normalize_strategy": "computed",
+
+        // metadata: 索引文件路径（.csv），记录 H5 文件名、时间戳、经纬度等元信息
+        // 运行时需要在这里填写真实路径
         "metadata": null,
+
+        // h5_dir: 存放 .h5 样本数据的文件夹路径
         "h5_dir": null,
+
+        // output_dir: 推理结果（特征 .pt 或可视化图片）的输出保存路径
         "output_dir": "results",
+
+        // max_samples: Debug 模式，设为数字（如 5）则跑完前 N 个样本后自动停止
+        // 设为 null 代表跑完全部数据
         "max_samples": null,
+
+        // save_features: 是否将提取的高维特征张量保存为本地文件
         "save_features": false,
+
+        // visualize: 是否自动生成并保存可视化图表（输入图像与特征图对比）
         "visualize": true
     },
     "paths": {
+        // weights: 预训练模型参数（Checkpoint）的路径
+        // 如果路径找不到，代码会自动使用随机初始化权重进行测试
         "weights": "params/weights.pth"
     }
 }
