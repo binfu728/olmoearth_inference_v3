@@ -14,6 +14,11 @@
             "sentinel2_l2a",
             "sentinel1",
             "landsat"
+        ],
+        "inference_use": [
+            "sentinel2_l2a",
+            "sentinel1",
+            "landsat"
         ]
     },
     "inference": {
