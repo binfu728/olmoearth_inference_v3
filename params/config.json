@@ -14,6 +14,11 @@
             "sentinel2_l2a",
             "sentinel1",
             "landsat"
+        ],
+        "inference_use": [
+            "sentinel2_l2a",
+            "sentinel1",
+            "landsat"
         ]
     },
     "inference": {
@@ -21,14 +26,14 @@
         "batch_size": 1,
         "device": "cuda",
         "normalize_strategy": "computed",
-        "metadata": null,
-        "h5_dir": null,
+        "metadata": "/mnt/ht2-nas2/00-model/00-fb/olmo_test/inference_data/metadata_test.csv",
+        "h5_dir": "/mnt/ht2-nas2/00-model/00-fb/olmo_test/inference_data",
         "output_dir": "results",
         "max_samples": null,
         "save_features": false,
         "visualize": true
     },
     "paths": {
-        "weights": "params/weights.pth"
+        "weights": "/mnt/ht2-nas2/00-model/00-fb/olmo_test/params/weights.pth"
     }
 }
